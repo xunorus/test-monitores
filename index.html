@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test de monitores · nivel · pan · fase · barrido</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font:15px/1.45 ui-sans-serif,-apple-system,"SF Pro Text",system-ui,sans-serif;
+    background:radial-gradient(1200px 600px at 50% -10%, #16202b 0%, #0a0c0f 55%) fixed;
+    color:#e8eef5; min-height:100vh; padding-bottom:70px; -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+  /* ---------- barra superior ---------- */
+  header.bar{
+    position:sticky; top:0; z-index:20;
+    display:flex; flex-wrap:wrap; gap:14px 20px; align-items:center;
+    padding:12px 18px; backdrop-filter:blur(14px);
+    background:rgba(10,12,15,.85); border-bottom:1px solid #1d242e;
+  }
+  .brand{display:flex;align-items:center;gap:10px;margin-right:auto}
+  .brand strong{font-size:15px;letter-spacing:.02em}
+  .dot{width:10px;height:10px;border-radius:50%;background:#33404f;transition:.2s}
+  .dot.live{background:#39d0a3;box-shadow:0 0 12px #39d0a3}
+  .mode{font-size:12px;color:#7f93a8;letter-spacing:.04em}
+
+  .grp{display:flex;flex-direction:column;gap:4px;min-width:170px}
+  .grp > label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#6f8499}
+  .freqline{display:flex;align-items:center;gap:10px}
+  .freqline .mono{min-width:78px;text-align:right;color:#8ff0d4;font-size:13px}
+
+  .seg{display:inline-flex;background:#131922;border:1px solid #232c37;border-radius:11px;padding:3px;gap:3px}
+  .seg button{border:0;background:transparent;border-radius:8px;padding:7px 12px;color:#93a3b4}
+  .seg button.on{background:#0f3a30;color:#8ff0d4;box-shadow:0 0 0 1px #39d0a355 inset}
+  .seg.big{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
+  .seg.big button{padding:13px 6px;font-size:14px}
+  .seg.two{display:grid;grid-template-columns:1fr 1fr;width:100%}
+
+  button{
+    font:inherit;color:#dbe6f0;background:#1a222c;border:1px solid #2a3542;
+    border-radius:10px;padding:9px 13px;cursor:pointer;transition:.15s;
+  }
+  button:hover{background:#212b37;border-color:#3a4756}
+  button.on{background:#0f3a30;border-color:#39d0a3;color:#8ff0d4;box-shadow:0 0 0 1px #39d0a355 inset}
+  .ghost{background:transparent;border-color:#2a3542;color:#8496a8;font-size:12px;padding:6px 10px}
+  button.stop{
+    background:#3a1216;border:1px solid #8e2b33;color:#ffb4bb;font-weight:700;
+    letter-spacing:.12em;padding:10px 18px;border-radius:12px;
+  }
+  button.stop.live{background:#c22a36;color:#fff;border-color:#ff6b78;box-shadow:0 0 22px #c22a3655}
+  .kbd{display:block;font-size:9px;font-weight:400;letter-spacing:.08em;opacity:.65;margin-top:1px}
+
+  /* ---------- layout ---------- */
+  main{
+    display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));
+    padding:18px;max-width:1320px;margin:0 auto;align-items:start;
+  }
+  .card{
+    background:linear-gradient(180deg,#141a22,#10151b);
+    border:1px solid #1e2731;border-radius:16px;padding:16px 18px;
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .card.wide{grid-column:1/-1}
+  .card h2{
+    margin:0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#7f93a8;font-weight:600;
+  }
+  .hint{margin:0;color:#93a3b4;font-size:13px}
+  .hint.small{font-size:12px;color:#7d8fa1}
+  .hint b{color:#cfe0f0}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .row > label{display:flex;align-items:center;gap:8px;font-size:12px;color:#93a3b4}
+
+  /* ---------- controles ---------- */
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:#243040}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;
+    background:#39d0a3;border:2px solid #0a0c0f;box-shadow:0 0 8px #39d0a355;
+  }
+  input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:#243040}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border:2px solid #0a0c0f;border-radius:50%;background:#39d0a3}
+  select{
+    font:inherit;font-size:13px;background:#131922;color:#dbe6f0;border:1px solid #2a3542;
+    border-radius:8px;padding:5px 8px;
+  }
+
+  /* ---------- canal / trims / medidores ---------- */
+  .chbig{
+    font-size:21px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    color:#41525f;text-align:center;padding:4px 0;transition:.2s;
+  }
+  .chbig.on{color:#8ff0d4;text-shadow:0 0 20px #39d0a355}
+  .chbig.warn{color:#ffb4bb;text-shadow:0 0 20px #c22a3655}
+
+  .trims{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .trim label{display:flex;justify-content:space-between;font-size:12px;color:#93a3b4;margin-bottom:2px}
+  .trim .mono{color:#8ff0d4}
+
+  .meters{display:flex;flex-direction:column;gap:6px}
+  .meterrow{display:flex;align-items:center;gap:10px;font-size:12px;color:#8ba0b4}
+  .meterrow > span{width:10px;font-weight:700;color:#6f8499}
+  .meter{flex:1;height:10px;background:#1a222c;border-radius:6px;overflow:hidden}
+  .meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,#2f7fd8,#39d0a3);border-radius:6px}
+
+  /* ---------- paneo ---------- */
+  .panvis{
+    position:relative;height:38px;border-radius:11px;border:1px solid #24303d;
+    background:linear-gradient(90deg,#131c26,#243040 50%,#131c26);
+  }
+  .panvis:after{
+    content:"";position:absolute;left:50%;top:8px;bottom:8px;width:1px;background:#ffffff22;
+  }
+  .panDot{
+    position:absolute;top:50%;left:50%;width:16px;height:16px;border-radius:50%;
+    transform:translate(-50%,-50%);background:#39d0a3;box-shadow:0 0 14px #39d0a3aa;
+  }
+
+  /* ---------- barrido / frecuencias ---------- */
+  .sweepread{
+    font-size:26px;text-align:center;color:#8ff0d4;letter-spacing:.04em;padding:4px 0;
+    text-shadow:0 0 22px #39d0a344;
+  }
+  .freqs{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px}
+  .freqs button{padding:7px 4px;font-size:12px;border-radius:8px}
+
+  /* ---------- guía ---------- */
+  .guide ol{margin:0;padding-left:20px;color:#9fb0c2;font-size:13px}
+  .guide li{margin:6px 0}
+  .guide b{color:#cfe0f0}
+  .guide code{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#8ff0d4;background:#0d1218;padding:1px 5px;border-radius:5px}
+  .warnbox{
+    border-left:3px solid #f0a34a;background:#1a1409;color:#e8cd9e;
+    padding:10px 14px;border-radius:0 10px 10px 0;font-size:13px;
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand">
+    <span class="dot" id="runDot"></span>
+    <strong>Test de monitores</strong>
+    <span class="mode" id="modeLabel">en reposo</span>
+  </div>
+
+  <div class="grp">
+    <label>Señal</label>
+    <div class="seg" id="srcSeg">
+      <button data-src="pink" class="on">Ruido rosa</button>
+      <button data-src="tone">Tono</button>
+    </div>
+  </div>
+
+  <div class="grp" style="min-width:230px">
+    <label>Frecuencia del tono</label>
+    <div class="freqline">
+      <input type="range" id="freqSlider" min="0" max="100" step="0.5" value="56.6" aria-label="Frecuencia">
+      <span class="mono" id="freqRead">1.00 kHz</span>
+    </div>
+  </div>
+
+  <div class="grp" style="min-width:190px">
+    <label>Volumen maestro</label>
+    <div class="freqline">
+      <input type="range" id="volSlider" min="0" max="100" step="1" value="35" aria-label="Volumen maestro">
+      <span class="mono" id="volRead">-</span>
+    </div>
+  </div>
+
+  <button id="stopBtn" class="stop">STOP<span class="kbd">espacio</span></button>
+</header>
+
+<main>
+
+  <!-- 1 · NIVEL POR CANAL -->
+  <section class="card">
+    <h2>1 · Nivel por canal</h2>
+    <p class="hint">Medí cada monitor por separado y emparejá los niveles con los trims.</p>
+
+    <div class="seg big" id="chSeg">
+      <button data-ch="L">Izquierda</button>
+      <button data-ch="both" class="on">Ambos</button>
+      <button data-ch="R">Derecha</button>
+    </div>
+
+    <button id="altBtn">Alternar L / R cada 2 s</button>
+
+    <div class="chbig" id="chBig">—</div>
+
+    <div class="trims">
+      <div class="trim">
+        <label>Trim L <span class="mono" id="trimLRead">0.0 dB</span></label>
+        <input type="range" id="trimL" min="-12" max="12" step="0.5" value="0" aria-label="Trim izquierda">
+      </div>
+      <div class="trim">
+        <label>Trim R <span class="mono" id="trimRRead">0.0 dB</span></label>
+        <input type="range" id="trimR" min="-12" max="12" step="0.5" value="0" aria-label="Trim derecha">
+      </div>
+    </div>
+
+    <div class="meters">
+      <div class="meterrow"><span>L</span><div class="meter"><i id="meterL"></i></div></div>
+      <div class="meterrow"><span>R</span><div class="meter"><i id="meterR"></i></div></div>
+    </div>
+
+    <button class="ghost" id="trimReset">Resetear trims</button>
+  </section>
+
+  <!-- 2 · PANEO -->
+  <section class="card">
+    <h2>2 · Imagen central y paneo</h2>
+    <p class="hint">Con los dos canales igualados, el centro tiene que sonar en el medio físico, sin saltos ni huecos al barrer.</p>
+
+    <input type="range" id="panSlider" min="-1" max="1" step="0.01" value="0" aria-label="Paneo">
+    <div class="panvis"><span class="panDot" id="panDot"></span></div>
+
+    <div class="row">
+      <button id="panAutoBtn">Barrido automático</button>
+      <label>Velocidad <input type="range" id="panSpeed" min="2" max="16" step="1" value="8" style="width:120px"></label>
+      <span class="mono" id="panSpeedRead" style="font-size:12px;color:#6f8499">8 s / ciclo</span>
+    </div>
+  </section>
+
+  <!-- 3 · FASE -->
+  <section class="card">
+    <h2>3 · Fase y polaridad</h2>
+    <p class="hint">Usá <b>tono de 100 Hz</b> y los dos canales a la vez. Al pasar a "fuera de fase" el grave debería casi desaparecer.</p>
+
+    <div class="seg two" id="phaseSeg">
+      <button data-phase="in" class="on">En fase</button>
+      <button data-phase="out">Fuera de fase</button>
+    </div>
+
+    <p class="hint small">Si el grave se cae <b>en fase</b> y aparece fuera de fase, hay un cable de parlante invertido (o un pin del ampli cruzado).</p>
+  </section>
+
+  <!-- 4 · BARRIDO -->
+  <section class="card">
+    <h2>4 · Barrido y tonos fijos</h2>
+    <p class="hint">20 Hz → 20 kHz. Escuchá baches, resonancias y sibilancias.</p>
+
+    <div class="sweepread mono" id="sweepRead">20 Hz</div>
+
+    <div class="row">
+      <button id="sweepBtn">Iniciar barrido</button>
+      <label>duración
+        <select id="sweepDur">
+          <option>5</option>
+          <option selected>10</option>
+          <option>20</option>
+          <option>30</option>
+        </select> s
+      </label>
+    </div>
+
+    <div class="freqs" id="freqBtns"></div>
+  </section>
+
+  <!-- 5 · GUÍA -->
+  <section class="card wide guide">
+    <h2>Guía rápida de calibración</h2>
+    <div class="warnbox">
+      <b>Oídos primero.</b> Empezá con el volumen maestro bajo y subí de a poco. Nunca pongas ruido rosa a volumen de mezcla
+      sin saber a qué SPL estás: 15 minutos a 90 dB te arruinan la referencia del día.
+    </div>
+    <ol>
+      <li><b>Preparación:</b> fijá el volumen de salida de la interfaz / Mac y no lo toques más durante la medición.
+          Dejá el balance del sistema centrado (Preferencias de sonido y Configuración de Audio y MIDI) — si el sistema ya
+          está compensando, el test no mide los parlantes.</li>
+      <li><b>Micrófono:</b> app de SPL en el celular (Decibel X, NIOSH SLM), ponderación <b>C o Z</b>, respuesta <b>Slow</b>.
+          Apoyalo en el punto de escucha, misma altura y misma posición para las dos mediciones. No lo muevas entre canales.</li>
+      <li><b>Medición:</b> elegí <b>Ruido rosa</b> → <b>Izquierda</b>, anotá el dB → <b>Derecha</b>, anotá el dB.
+          Con <b>Alternar L/R</b> la lectura no debería saltar más de ±1 dB.</li>
+      <li><b>Corrección:</b> bajá con el trim el canal que mide más fuerte, hasta que la diferencia quede dentro de 1 dB.
+          Los trims se guardan en el navegador, así que podés volver mañana y seguir donde estabas.</li>
+      <li><b>Sentido común:</b> si un monitor necesita más de 3 dB de corrección, el problema no es el nivel: revisá
+          distancia, toe-in, altura, simetría de la sala y que no haya un objeto tapando un tweeter.</li>
+      <li><b>Verificación subjetiva:</b> ruido rosa en <b>Ambos</b>, después el barrido de paneo. El centro debe quedar
+          quieto y centrado; si se corre a un lado, o el nivel o la simetría de la sala están mal.</li>
+      <li><b>Barrido:</b> pasalo en cada canal y en ambos. Anotá dónde hay cancelaciones (cruce mal alineado, típico 1–3 kHz)
+          y refuerzos (modos de sala, típico 40–120 Hz).</li>
+    </ol>
+    <p class="hint small">Atajos de teclado: <code>espacio</code> parar · <code>L</code> izquierda · <code>R</code> derecha · <code>B</code> ambos.</p>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const AC = window.AudioContext || window.webkitAudioContext;
+
+  const TONE_AMP = 0.20;   // amplitud pico del tono (≈ -14 dBFS)
+  const PINK_RMS = 0.16;   // RMS del ruido rosa (≈ -16 dBFS)
+
+  /* ---------------- estado ---------------- */
+  let mode = 'idle';        // idle | static | pan | phase | sweep
+  let ch = 'both';          // L | R | both
+  let source = 'pink';      // pink | tone
+  let freq = 1000;
+  let invert = false;
+  let pan = 0;
+  let panAuto = false;
+  let alternator = null;
+  let panRAF = null, sweepRAF = null, sweepT0 = 0, sweepDur = 10;
+  let masterVol = 35;
+  const trims = { L: 0, R: 0 };
+
+  /* persistencia */
+  try {
+    const saved = JSON.parse(localStorage.getItem('mon-test-v1') || '{}');
+    if (saved.trims) {
+      if (typeof saved.trims.L === 'number') trims.L = saved.trims.L;
+      if (typeof saved.trims.R === 'number') trims.R = saved.trims.R;
+    }
+    if (typeof saved.vol === 'number') masterVol = saved.vol;
+  } catch (e) {}
+  function save() {
+    try {
+      localStorage.setItem('mon-test-v1', JSON.stringify({ trims, vol: masterVol }));
+    } catch (e) {}
+  }
+
+  /* ---------------- audio ---------------- */
+  let ctx = null;
+  let master, merger, bus, gainL, gainR, invertG, pinkGain, pinkSrc, oscGain, osc, anaL, anaR;
+  let abuf = null;
+
+  const dbToGain = db => Math.pow(10, db / 20);
+  const volToGain = v => Math.pow(Math.max(0, Math.min(100, v)) / 100, 1.7) * 0.85;
+
+  function makePink(ac, seconds) {
+    const sr = ac.sampleRate, n = Math.floor(sr * seconds);
+    const buf = ac.createBuffer(1, n, sr);
+    const d = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, sum = 0;
+    for (let i = 0; i < n; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      b3 = 0.86650 * b3 + w * 0.3104856;
+      b4 = 0.55000 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.0168980;
+      const p = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362;
+      b6 = w * 0.115926;
+      d[i] = p;
+      sum += p * p;
+    }
+    const rms = Math.sqrt(sum / n) || 1;
+    const k = PINK_RMS / rms;
+    for (let i = 0; i < n; i++) d[i] *= k;
+    return buf;
+  }
+
+  function ensureAudio() {
+    if (ctx) {
+      if (ctx.state === 'suspended') ctx.resume();
+      return;
+    }
+    if (!AC) return;
+    ctx = new AC({ latencyHint: 'interactive' });
+
+    master = ctx.createGain();
+    master.gain.value = volToGain(masterVol);
+    master.connect(ctx.destination);
+
+    merger = ctx.createChannelMerger(2);
+    merger.connect(master);
+
+    bus = ctx.createGain();
+    bus.gain.value = 1;
+
+    gainL = ctx.createGain(); gainL.gain.value = 0;
+    gainR = ctx.createGain(); gainR.gain.value = 0;
+    invertG = ctx.createGain(); invertG.gain.value = 1;
+
+    bus.connect(gainL);
+    gainL.connect(merger, 0, 0);
+    bus.connect(invertG);
+    invertG.connect(gainR);
+    gainR.connect(merger, 0, 1);
+
+    anaL = ctx.createAnalyser(); anaL.fftSize = 1024;
+    anaR = ctx.createAnalyser(); anaR.fftSize = 1024;
+    gainL.connect(anaL);
+    gainR.connect(anaR);
+    abuf = new Float32Array(anaL.fftSize);
+
+    pinkGain = ctx.createGain(); pinkGain.gain.value = 0;
+    pinkSrc = ctx.createBufferSource();
+    pinkSrc.buffer = makePink(ctx, 3);
+    pinkSrc.loop = true;
+    pinkSrc.connect(pinkGain);
+    pinkGain.connect(bus);
+    pinkSrc.start();
+
+    oscGain = ctx.createGain(); oscGain.gain.value = 0;
+    osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.connect(oscGain);
+    oscGain.connect(bus);
+    osc.start();
+
+    updateOutputs();
+    requestAnimationFrame(meters);
+    refreshUI();
+  }
+
+  function setT(param, v, tc = 0.02) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (param.cancelAndHoldAtTime) param.cancelAndHoldAtTime(t);
+    else param.cancelScheduledValues(t);
+    param.setTargetAtTime(v, t, tc);
+  }
+
+  function setOscFreq(f) {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    osc.frequency.cancelScheduledValues(t);
+    osc.frequency.setValueAtTime(f, t);
+  }
+
+  function updateOutputs() {
+    if (!ctx) return;
+    const tl = dbToGain(trims.L), tr = dbToGain(trims.R);
+    let l = 0, r = 0;
+
+    if (mode === 'static' || mode === 'phase' || mode === 'sweep') {
+      if (ch !== 'R') l = tl;
+      if (ch !== 'L') r = tr;
+    } else if (mode === 'pan') {
+      const a = (pan + 1) * Math.PI / 4;   // 0 = todo izq, PI/2 = todo der
+      l = Math.cos(a) * tl;
+      r = Math.sin(a) * tr;
+    }
+
+    setT(gainL.gain, l);
+    setT(gainR.gain, r);
+    setT(invertG.gain, invert ? -1 : 1);
+
+    const active = mode !== 'idle';
+    const useOsc = mode === 'sweep' || source === 'tone';
+
+    setT(pinkGain.gain, active && !useOsc ? 1 : 0);
+    setT(oscGain.gain, active && useOsc ? TONE_AMP : 0, 0.03);
+  }
+
+  /* ---------------- medidores ---------------- */
+  const msmooth = { L: -100, R: -100 };
+  function rmsDb(an) {
+    if (!an) return -100;
+    an.getFloatTimeDomainData(abuf);
+    let s = 0;
+    for (let i = 0; i < abuf.length; i++) s += abuf[i] * abuf[i];
+    const r = Math.sqrt(s / abuf.length);
+    return r > 0 ? 20 * Math.log10(r) : -100;
+  }
+  function meters() {
+    requestAnimationFrame(meters);
+    if (!ctx) return;
+    msmooth.L += (rmsDb(anaL) - msmooth.L) * 0.25;
+    msmooth.R += (rmsDb(anaR) - msmooth.R) * 0.25;
+    bar($('#meterL'), msmooth.L);
+    bar($('#meterR'), msmooth.R);
+  }
+  function bar(el, db) {
+    const p = Math.max(0, Math.min(1, (db + 60) / 60));
+    el.style.width = (p * 100).toFixed(1) + '%';
+  }
+
+  /* ---------------- utilidades UI ---------------- */
+  const fmtHz = f => f >= 1000
+    ? (f / 1000).toFixed(f < 10000 ? 2 : 1) + ' kHz'
+    : f.toFixed(0) + ' Hz';
+
+  const sliderToFreq = v => 20 * Math.pow(1000, v / 100);
+  const freqToSlider = f => 100 * Math.log(f / 20) / Math.log(1000);
+
+  function stopTimers() {
+    if (alternator) { clearInterval(alternator); alternator = null; }
+    if (panRAF) { cancelAnimationFrame(panRAF); panRAF = null; }
+    if (sweepRAF) { cancelAnimationFrame(sweepRAF); sweepRAF = null; }
+    panAuto = false;
+  }
+
+  function stopAll() {
+    stopTimers();
+    mode = 'idle';
+    ch = 'both';
+    invert = false;
+    pan = 0;
+    $('#panSlider').value = 0;
+    $('#sweepRead').textContent = '20 Hz';
+    updateOutputs();
+    refreshUI();
+  }
+
+  function refreshUI() {
+    const labels = {
+      idle: 'en reposo',
+      static: ch === 'L' ? 'canal izquierdo' : ch === 'R' ? 'canal derecho' : 'ambos canales',
+      pan: panAuto ? 'barrido de paneo' : 'paneo manual',
+      phase: invert ? 'fuera de fase' : 'en fase',
+      sweep: 'barrido de frecuencia'
+    };
+    $('#modeLabel').textContent = labels[mode];
+    const live = mode !== 'idle';
+    $('#runDot').classList.toggle('live', live);
+    $('#stopBtn').classList.toggle('live', live);
+
+    /* canal */
+    const chActive = mode === 'static' ? ch : null;
+    $$('#chSeg button').forEach(b => b.classList.toggle('on', b.dataset.ch === chActive));
+
+    const big = $('#chBig');
+    let txt = '—', cls = '';
+    if (mode === 'static') {
+      txt = ch === 'L' ? 'izquierda' : ch === 'R' ? 'derecha' : 'ambos';
+      cls = 'on';
+    } else if (mode === 'pan') {
+      txt = Math.abs(pan) < 0.05 ? 'centro' : pan < 0 ? 'izquierda' : 'derecha';
+      cls = 'on';
+    } else if (mode === 'phase') {
+      txt = invert ? 'ambos · fuera de fase' : 'ambos · en fase';
+      cls = invert ? 'warn' : 'on';
+    } else if (mode === 'sweep') {
+      txt = 'barrido';
+      cls = 'on';
+    }
+    big.textContent = txt;
+    big.className = 'chbig ' + cls;
+
+    $('#altBtn').classList.toggle('on', !!alternator);
+
+    /* fase */
+    $$('#phaseSeg button').forEach(b => {
+      const want = b.dataset.phase === 'out';
+      b.classList.toggle('on', mode === 'phase' && want === invert);
+    });
+
+    /* paneo */
+    $('#panAutoBtn').classList.toggle('on', panAuto);
+    $('#panDot').style.left = (((pan + 1) / 2) * 100).toFixed(2) + '%';
+
+    /* señal / frecuencia */
+    $$('#srcSeg button').forEach(b => b.classList.toggle('on', b.dataset.src === source));
+    $('#freqRead').textContent = fmtHz(freq);
+    $$('#freqBtns button').forEach(b => {
+      b.classList.toggle('on', Number(b.dataset.f) === Math.round(freq));
+    });
+
+    /* trims */
+    $('#trimLRead').textContent = (trims.L > 0 ? '+' : '') + trims.L.toFixed(1) + ' dB';
+    $('#trimRRead').textContent = (trims.R > 0 ? '+' : '') + trims.R.toFixed(1) + ' dB';
+
+    /* volumen */
+    const vg = volToGain(masterVol);
+    $('#volRead').textContent = vg > 0 ? (20 * Math.log10(vg)).toFixed(1) + ' dB' : '-∞';
+    $('#panSpeedRead').textContent = $('#panSpeed').value + ' s / ciclo';
+  }
+
+  /* ---------------- acciones ---------------- */
+  function playStatic() {
+    stopTimers();
+    if (mode !== 'phase' && mode !== 'sweep') mode = 'static';
+    if (mode === 'sweep') mode = 'static';
+    if (source === 'tone') setOscFreq(freq);
+    updateOutputs();
+    refreshUI();
+  }
+
+  function setChannel(c) {
+    ensureAudio();
+    ch = c;
+    mode = 'static';
+    playStatic();
+  }
+
+  function setFreq(f, play) {
+    freq = f;
+    $('#freqSlider').value = freqToSlider(f).toFixed(1);
+    source = 'tone';
+    ensureAudio();
+    if (play) { mode = 'static'; }
+    if (ctx && mode !== 'sweep') setOscFreq(f);
+    updateOutputs();
+    refreshUI();
+  }
+
+  /* ---------------- listeners: audio on gesture ---------------- */
+  document.addEventListener('pointerdown', ensureAudio, true);
+  document.addEventListener('keydown', ensureAudio, true);
+
+  /* ---------------- canal ---------------- */
+  $('#chSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-ch]');
+    if (!b) return;
+    setChannel(b.dataset.ch);
+  });
+
+  $('#altBtn').addEventListener('click', () => {
+    ensureAudio();
+    if (alternator) {
+      clearInterval(alternator);
+      alternator = null;
+      updateOutputs();
+      refreshUI();
+      return;
+    }
+    stopTimers();
+    mode = 'static';
+    ch = 'L';
+    if (source === 'tone') setOscFreq(freq);
+    updateOutputs();
+    refreshUI();
+    alternator = setInterval(() => {
+      ch = ch === 'L' ? 'R' : 'L';
+      updateOutputs();
+      refreshUI();
+    }, 2000);
+  });
+
+  /* ---------------- trims ---------------- */
+  $('#trimL').addEventListener('input', e => {
+    trims.L = parseFloat(e.target.value);
+    save();
+    updateOutputs();
+    refreshUI();
+  });
+  $('#trimR').addEventListener('input', e => {
+    trims.R = parseFloat(e.target.value);
+    save();
+    updateOutputs();
+    refreshUI();
+  });
+  $('#trimReset').addEventListener('click', () => {
+    trims.L = 0; trims.R = 0;
+    $('#trimL').value = 0;
+    $('#trimR').value = 0;
+    save();
+    updateOutputs();
+    refreshUI();
+  });
+
+  /* ---------------- paneo ---------------- */
+  $('#panSlider').addEventListener('input', e => {
+    ensureAudio();
+    stopTimers();
+    mode = 'pan';
+    pan = parseFloat(e.target.value);
+    if (source === 'tone') setOscFreq(freq);
+    updateOutputs();
+    refreshUI();
+  });
+
+  $('#panAutoBtn').addEventListener('click', () => {
+    ensureAudio();
+    if (panAuto) {
+      panAuto = false;
+      if (panRAF) { cancelAnimationFrame(panRAF); panRAF = null; }
+      refreshUI();
+      return;
+    }
+    stopTimers();
+    mode = 'pan';
+    panAuto = true;
+    if (source === 'tone') setOscFreq(freq);
+    updateOutputs();
+    refreshUI();
+
+    const t0 = performance.now();
+    const period = parseFloat($('#panSpeed').value) * 1000;
+    const tick = () => {
+      if (!panAuto || mode !== 'pan') return;
+      pan = Math.sin(((performance.now() - t0) / period) * Math.PI * 2);
+      $('#panSlider').value = pan.toFixed(2);
+      updateOutputs();
+      $('#panDot').style.left = (((pan + 1) / 2) * 100).toFixed(2) + '%';
+      const tmp = Math.abs(pan) < 0.05 ? 'centro' : pan < 0 ? 'izquierda' : 'derecha';
+      const cb = $('#chBig');
+      cb.textContent = tmp;
+      cb.className = 'chbig on';
+      panRAF = requestAnimationFrame(tick);
+    };
+    panRAF = requestAnimationFrame(tick);
+  });
+
+  $('#panSpeed').addEventListener('input', () => {
+    $('#panSpeedRead').textContent = $('#panSpeed').value + ' s / ciclo';
+  });
+
+  /* ---------------- fase ---------------- */
+  $('#phaseSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-phase]');
+    if (!b) return;
+    ensureAudio();
+    stopTimers();
+    mode = 'phase';
+    ch = 'both';
+    invert = b.dataset.phase === 'out';
+    if (source === 'tone') setOscFreq(freq);
+    updateOutputs();
+    refreshUI();
+  });
+
+  /* ---------------- fuente y frecuencia ---------------- */
+  $('#srcSeg').addEventListener('click', e => {
+    const b = e.target.closest('button[data-src]');
+    if (!b) return;
+    ensureAudio();
+    source = b.dataset.src;
+    if (mode === 'idle' || mode === 'pan' || mode === 'phase') mode = 'static';
+    if (source === 'tone') setOscFreq(freq);
+    updateOutputs();
+    refreshUI();
+  });
+
+  $('#freqSlider').addEventListener('input', e => {
+    const f = sliderToFreq(parseFloat(e.target.value));
+    setFreq(f, false);
+  });
+
+  const QUICK = [40, 60, 80, 100, 150, 200, 300, 400, 600, 800,
+                 1000, 1500, 2000, 3000, 4000, 6000, 8000, 10000, 12000, 16000];
+  const fw = $('#freqBtns');
+  QUICK.forEach(f => {
+    const b = document.createElement('button');
+    b.textContent = fmtHz(f);
+    b.dataset.f = f;
+    b.addEventListener('click', () => setFreq(f, true));
+    fw.appendChild(b);
+  });
+
+  /* ---------------- barrido ---------------- */
+  $('#sweepBtn').addEventListener('click', () => {
+    if (mode === 'sweep') { stopAll(); return; }
+    ensureAudio();
+    if (!ctx) return;
+    stopTimers();
+    mode = 'sweep';
+    ch = 'both';
+    invert = false;
+    sweepDur = parseFloat($('#sweepDur').value);
+
+    const t0 = ctx.currentTime + 0.06;
+    osc.frequency.cancelScheduledValues(ctx.currentTime);
+    osc.frequency.setValueAtTime(20, t0);
+    osc.frequency.exponentialRampToValueAtTime(20000, t0 + sweepDur);
+    sweepT0 = t0;
+
+    updateOutputs();
+    refreshUI();
+
+    const tick = () => {
+      if (mode !== 'sweep') return;
+      const p = Math.min(1, Math.max(0, (ctx.currentTime - sweepT0) / sweepDur));
+      $('#sweepRead').textContent = fmtHz(20 * Math.pow(1000, p));
+      if (p >= 1) { stopAll(); return; }
+      sweepRAF = requestAnimationFrame(tick);
+    };
+    tick();
+  });
+
+  /* ---------------- volumen y stop ---------------- */
+  $('#volSlider').addEventListener('input', e => {
+    masterVol = parseInt(e.target.value, 10);
+    if (ctx) setT(master.gain, volToGain(masterVol), 0.05);
+    save();
+    $('#volRead').textContent = (20 * Math.log10(volToGain(masterVol) || 1e-9)).toFixed(1) + ' dB';
+  });
+
+  $('#stopBtn').addEventListener('click', stopAll);
+
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, select, textarea')) return;
+    if (e.code === 'Space') { e.preventDefault(); stopAll(); }
+    else if (e.key === 'l' || e.key === 'L') setChannel('L');
+    else if (e.key === 'r' || e.key === 'R') setChannel('R');
+    else if (e.key === 'b' || e.key === 'B') setChannel('both');
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopAll();
+  });
+
+  /* ---------------- arranque ---------------- */
+  $('#trimL').value = trims.L;
+  $('#trimR').value = trims.R;
+  $('#volSlider').value = masterVol;
+  refreshUI();
+})();
+</script>
+</body>
+</html>
